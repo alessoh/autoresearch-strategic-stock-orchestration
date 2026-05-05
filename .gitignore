@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+
+# Project data
+data/prices.parquet
+latest_score.json
+*.log
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+build/
+.npm/
+.pnp.*
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+.claude/
+
+# macOS
+.DS_Store
+._*
+.AppleDouble
+.LSOverride
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
