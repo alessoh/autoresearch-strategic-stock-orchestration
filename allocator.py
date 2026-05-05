@@ -28,9 +28,9 @@ def allocate(
     bh_vol = buy_hold_returns.rolling(window=vol_lookback, min_periods=vol_lookback).std()
 
     # Compute rolling 60-day cumulative returns (momentum of strategies)
-    mom_perf = momentum_returns.rolling(window=vol_lookback, min_periods=vol_lookback).sum()
-    mr_perf = mean_reversion_returns.rolling(window=vol_lookback, min_periods=vol_lookback).sum()
-    bh_perf = buy_hold_returns.rolling(window=vol_lookback, min_periods=vol_lookback).sum()
+    mom_perf = momentum_returns.ewm(span=vol_lookback, min_periods=vol_lookback).mean() * vol_lookback
+    mr_perf = mean_reversion_returns.ewm(span=vol_lookback, min_periods=vol_lookback).mean() * vol_lookback
+    bh_perf = buy_hold_returns.ewm(span=vol_lookback, min_periods=vol_lookback).mean() * vol_lookback
 
     # Combine inverse volatility with performance: (cumulative return / volatility)
     mom_score = mom_perf / mom_vol

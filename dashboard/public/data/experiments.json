@@ -58,5 +58,16 @@
     "diff": "--- a/strategies/momentum.py\n+++ b/strategies/momentum.py\n@@ -18,11 +18,16 @@ def compute_signal(prices: pd.DataFrame) -> pd.DataFrame:\n     \"\"\"\n     returns = prices.pct_change()\n     rolling_mean = returns.rolling(window=LOOKBACK_DAYS, min_periods=LOOKBACK_DAYS).mean()\n+    \n+    # 50-day price moving average for trend confirmation\n+    price_ma = prices.rolling(window=50, min_periods=50).mean()\n \n     signal = rolling_mean.copy()\n     signal[rolling_mean > 0] = 1\n     signal[rolling_mean < 0] = -1\n     signal[rolling_mean == 0] = 0\n+    # Only take longs above MA, shorts below MA\n+    signal[(rolling_mean > 0) & (prices <= price_ma)] = 0\n+    signal[(rolling_mean < 0) & (prices >= price_ma)] = 0\n     signal = signal.fillna(0)\n \n     return signal.shift(1).fillna(0)\n",
     "val_sharpe_after": 2.3562,
     "delta": -0.0309
+  },
+  {
+    "experiment": 57,
+    "timestamp": "2026-05-05T23:29:21.875506+00:00",
+    "val_sharpe_before": 2.4852,
+    "kept": false,
+    "status": "ok",
+    "description": "Add volatility normalization to mean-reversion signal to adapt threshold sensitivity to current market volatility regime.",
+    "diff": "--- a/strategies/mean_reversion.py\n+++ b/strategies/mean_reversion.py\n@@ -6,7 +6,7 @@ import pandas as pd\n \n # Tunable parameters -- agent may modify these\n LOOKBACK_DAYS = 10\n-ZSCORE_THRESHOLD = 1.5\n+ZSCORE_THRESHOLD = 1.2\n \n \n def compute_signal(prices: pd.DataFrame) -> pd.DataFrame:\n@@ -20,11 +20,18 @@ def compute_signal(prices: pd.DataFrame) -> pd.DataFrame:\n     \"\"\"\n     rolling_mean = prices.rolling(window=LOOKBACK_DAYS, min_periods=LOOKBACK_DAYS).mean()\n     rolling_std = prices.rolling(window=LOOKBACK_DAYS, min_periods=LOOKBACK_DAYS).std()\n+    \n+    # Compute realized volatility over a longer window to detect regime\n+    returns = prices.pct_change()\n+    realized_vol = returns.rolling(window=60, min_periods=60).std()\n+    long_vol = returns.rolling(window=252, min_periods=252).std()\n+    vol_ratio = realized_vol / long_vol\n+    \n     zscore = (prices - rolling_mean) / rolling_std\n \n     signal = zscore.copy()\n     signal[:] = 0\n-    signal[zscore < -ZSCORE_THRESHOLD] = 1\n-    signal[zscore > ZSCORE_THRESHOLD] = -1\n+    signal[zscore < -ZSCORE_THRESHOLD * vol_ratio] = 1\n+    signal[zscore > ZSCORE_THRESHOLD * vol_ratio] = -1\n     signal = signal.fillna(0)\n \n     return signal.shift(1).fillna(0)\n",
+    "val_sharpe_after": 1.7659,
+    "delta": -0.7193
   }
 ]
