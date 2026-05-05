@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 
 # Tunable parameter -- agent may modify this
-LOOKBACK_DAYS = 20
+LOOKBACK_DAYS = 12
 
 
 def compute_signal(prices: pd.DataFrame) -> pd.DataFrame:
