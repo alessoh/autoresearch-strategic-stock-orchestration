@@ -36,5 +36,16 @@
     "diff": "--- a/strategies/momentum.py\n+++ b/strategies/momentum.py\n@@ -7,6 +7,7 @@ import pandas as pd\n \n # Tunable parameter -- agent may modify this\n LOOKBACK_DAYS = 20\n+TREND_FILTER_DAYS = 50\n \n \n def compute_signal(prices: pd.DataFrame) -> pd.DataFrame:\n@@ -18,11 +19,16 @@ def compute_signal(prices: pd.DataFrame) -> pd.DataFrame:\n     \"\"\"\n     returns = prices.pct_change()\n     rolling_mean = returns.rolling(window=LOOKBACK_DAYS, min_periods=LOOKBACK_DAYS).mean()\n+    \n+    # Trend filter: price relative to longer-term moving average\n+    price_ma = prices.rolling(window=TREND_FILTER_DAYS, min_periods=TREND_FILTER_DAYS).mean()\n+    above_ma = prices > price_ma\n \n     signal = rolling_mean.copy()\n     signal[rolling_mean > 0] = 1\n     signal[rolling_mean < 0] = -1\n     signal[rolling_mean == 0] = 0\n+    signal[(rolling_mean > 0) & (~above_ma)] = 0  # Cancel longs below trend\n     signal = signal.fillna(0)\n \n     return signal.shift(1).fillna(0)\n",
     "val_sharpe_after": 1.0456,
     "delta": -0.1118
+  },
+  {
+    "experiment": 27,
+    "timestamp": "2026-05-05T23:23:20.466470+00:00",
+    "val_sharpe_before": 1.1574,
+    "kept": false,
+    "status": "ok",
+    "description": "Add momentum confirmation filter requiring price above 50-day moving average to reduce whipsaws in choppy markets.",
+    "diff": "--- a/strategies/momentum.py\n+++ b/strategies/momentum.py\n@@ -7,6 +7,7 @@ import pandas as pd\n \n # Tunable parameter -- agent may modify this\n LOOKBACK_DAYS = 20\n+TREND_FILTER_DAYS = 50\n \n \n def compute_signal(prices: pd.DataFrame) -> pd.DataFrame:\n@@ -18,11 +19,15 @@ def compute_signal(prices: pd.DataFrame) -> pd.DataFrame:\n     \"\"\"\n     returns = prices.pct_change()\n     rolling_mean = returns.rolling(window=LOOKBACK_DAYS, min_periods=LOOKBACK_DAYS).mean()\n+    trend_ma = prices.rolling(window=TREND_FILTER_DAYS, min_periods=TREND_FILTER_DAYS).mean()\n \n     signal = rolling_mean.copy()\n     signal[rolling_mean > 0] = 1\n     signal[rolling_mean < 0] = -1\n     signal[rolling_mean == 0] = 0\n+    \n+    # Only take long positions when price is above trend MA, shorts when below\n+    signal[(rolling_mean > 0) & (prices <= trend_ma)] = 0\n+    signal[(rolling_mean < 0) & (prices >= trend_ma)] = 0\n     signal = signal.fillna(0)\n \n     return signal.shift(1).fillna(0)\n",
+    "val_sharpe_after": 1.1579,
+    "delta": 0.0005
   }
 ]
