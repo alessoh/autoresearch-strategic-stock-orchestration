@@ -47,5 +47,16 @@
     "diff": "--- a/strategies/momentum.py\n+++ b/strategies/momentum.py\n@@ -7,6 +7,7 @@ import pandas as pd\n \n # Tunable parameter -- agent may modify this\n LOOKBACK_DAYS = 20\n+TREND_FILTER_DAYS = 50\n \n \n def compute_signal(prices: pd.DataFrame) -> pd.DataFrame:\n@@ -18,11 +19,15 @@ def compute_signal(prices: pd.DataFrame) -> pd.DataFrame:\n     \"\"\"\n     returns = prices.pct_change()\n     rolling_mean = returns.rolling(window=LOOKBACK_DAYS, min_periods=LOOKBACK_DAYS).mean()\n+    trend_ma = prices.rolling(window=TREND_FILTER_DAYS, min_periods=TREND_FILTER_DAYS).mean()\n \n     signal = rolling_mean.copy()\n     signal[rolling_mean > 0] = 1\n     signal[rolling_mean < 0] = -1\n     signal[rolling_mean == 0] = 0\n+    \n+    # Only take long positions when price is above trend MA, shorts when below\n+    signal[(rolling_mean > 0) & (prices <= trend_ma)] = 0\n+    signal[(rolling_mean < 0) & (prices >= trend_ma)] = 0\n     signal = signal.fillna(0)\n \n     return signal.shift(1).fillna(0)\n",
     "val_sharpe_after": 1.1579,
     "delta": 0.0005
+  },
+  {
+    "experiment": 31,
+    "timestamp": "2026-05-05T23:24:10.324159+00:00",
+    "val_sharpe_before": 2.3871,
+    "kept": false,
+    "status": "ok",
+    "description": "Add trend filter to momentum strategy: only trade when price is on same side of 50-day MA as signal.",
+    "diff": "--- a/strategies/momentum.py\n+++ b/strategies/momentum.py\n@@ -18,11 +18,16 @@ def compute_signal(prices: pd.DataFrame) -> pd.DataFrame:\n     \"\"\"\n     returns = prices.pct_change()\n     rolling_mean = returns.rolling(window=LOOKBACK_DAYS, min_periods=LOOKBACK_DAYS).mean()\n+    \n+    # 50-day price moving average for trend confirmation\n+    price_ma = prices.rolling(window=50, min_periods=50).mean()\n \n     signal = rolling_mean.copy()\n     signal[rolling_mean > 0] = 1\n     signal[rolling_mean < 0] = -1\n     signal[rolling_mean == 0] = 0\n+    # Only take longs above MA, shorts below MA\n+    signal[(rolling_mean > 0) & (prices <= price_ma)] = 0\n+    signal[(rolling_mean < 0) & (prices >= price_ma)] = 0\n     signal = signal.fillna(0)\n \n     return signal.shift(1).fillna(0)\n",
+    "val_sharpe_after": 2.3562,
+    "delta": -0.0309
   }
 ]

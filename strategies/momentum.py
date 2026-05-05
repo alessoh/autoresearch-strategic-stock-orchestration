@@ -18,10 +18,15 @@ def compute_signal(prices: pd.DataFrame) -> pd.DataFrame:
     returns = prices.pct_change()
     rolling_mean = returns.rolling(window=LOOKBACK_DAYS, min_periods=LOOKBACK_DAYS).mean()
 
+    # Trend filter: 50-day price moving average
+    price_ma = prices.rolling(window=50, min_periods=50).mean()
+
     signal = rolling_mean.copy()
     signal[rolling_mean > 0] = 1
     signal[rolling_mean < 0] = -1
     signal[rolling_mean == 0] = 0
+    # Only allow longs when price is above 50-day MA
+    signal[(signal == 1) & (prices < price_ma)] = 0
     signal = signal.fillna(0)
 
     return signal.shift(1).fillna(0)
