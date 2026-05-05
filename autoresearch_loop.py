@@ -103,19 +103,54 @@ def call_claude(client) -> Tuple[Optional[str], Optional[str]]:
     return description, diff
 
 
+def _clean_diff(diff: str) -> str:
+    """Pre-clean a diff body: strip trailing whitespace, normalize blank lines.
+
+    LLM output frequently contains trailing spaces on context lines and
+    pure-whitespace blank lines that ``git apply`` rejects in strict mode.
+    We rstrip every line and collapse pure-whitespace lines to a bare
+    space (preserving the leading marker for blank context lines).
+    """
+    cleaned_lines = []
+    for line in diff.splitlines():
+        if not line:
+            cleaned_lines.append("")
+            continue
+        first = line[0]
+        if first in (" ", "+", "-") and line.strip() == "":
+            cleaned_lines.append(first)
+        else:
+            cleaned_lines.append(line.rstrip())
+    return "\n".join(cleaned_lines) + "\n"
+
+
 def apply_diff(diff: str) -> bool:
-    """Write the diff to a temp file and apply it with ``git apply``."""
+    """Apply a unified diff with progressively more lenient flags.
+
+    Tries strict, then ignore-whitespace, then ignore-whitespace plus
+    recount (which tolerates a wrong line count in the ``@@`` hunk
+    header). Returns True on first success.
+    """
+    cleaned = _clean_diff(diff)
+
     with tempfile.NamedTemporaryFile("w", suffix=".patch", delete=False) as tmp:
-        tmp.write(diff)
-        if not diff.endswith("\n"):
-            tmp.write("\n")
+        tmp.write(cleaned)
         patch_path = tmp.name
+
+    flag_attempts = [
+        ["--whitespace=fix"],
+        ["--whitespace=fix", "--ignore-whitespace"],
+        ["--whitespace=fix", "--ignore-whitespace", "--recount"],
+    ]
+    last_err = ""
     try:
-        proc = run_cmd(["git", "apply", "--whitespace=fix", patch_path], check=False)
-        if proc.returncode != 0:
-            print(f"[git apply] failed: {proc.stderr.strip()}")
-            return False
-        return True
+        for flags in flag_attempts:
+            proc = run_cmd(["git", "apply", *flags, patch_path], check=False)
+            if proc.returncode == 0:
+                return True
+            last_err = proc.stderr.strip()
+        print(f"[git apply] failed after fallbacks: {last_err}")
+        return False
     finally:
         try:
             os.unlink(patch_path)

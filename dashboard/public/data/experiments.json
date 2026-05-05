@@ -1,0 +1,29 @@
+[
+  {
+    "experiment": 1,
+    "timestamp": "2026-05-05T22:50:39.063453+00:00",
+    "val_sharpe_before": 1.0911,
+    "kept": false,
+    "status": "diff_apply_failed",
+    "description": "Scale allocator weights by inverse realized volatility to reduce exposure to more volatile strategies.",
+    "diff": "--- a/allocator.py\n+++ b/allocator.py\n@@ -5,6 +5,8 @@\n from __future__ import annotations\n \n import pandas as pd\n+import numpy as np\n+\n \n \n def allocate(\n@@ -17,11 +19,19 @@ def allocate(\n     Each row sums to 1.0. The columns are ``momentum``,\n     ``mean_reversion``, and ``buy_hold``. The baseline implementation\n     is a constant equal weight across all dates.\n     \"\"\"\n     index = momentum_returns.index\n+    \n+    # Compute rolling realized volatility for each strategy\n+    vol_window = 20\n+    momentum_vol = momentum_returns.rolling(window=vol_window, min_periods=vol_window).std()\n+    mean_reversion_vol = mean_reversion_returns.rolling(window=vol_window, min_periods=vol_window).std()\n+    buy_hold_vol = buy_hold_returns.rolling(window=vol_window, min_periods=vol_window).std()\n+    \n+    # Inverse volatility weights\n+    inv_vol = pd.DataFrame({\"momentum\": 1.0 / momentum_vol, \"mean_reversion\": 1.0 / mean_reversion_vol, \"buy_hold\": 1.0 / buy_hold_vol})\n+    inv_vol = inv_vol.fillna(0).replace([np.inf, -np.inf], 0)\n+    row_sums = inv_vol.sum(axis=1).replace(0, 1)\n+    weights = inv_vol.div(row_sums, axis=0)\n+    weights = weights.fillna(1.0 / 3.0)\n+    \n-    weights = pd.DataFrame(\n-        {\n-            \"momentum\": 1.0 / 3.0,\n-            \"mean_reversion\": 1.0 / 3.0,\n-            \"buy_hold\": 1.0 / 3.0,\n-        },\n-        index=index,\n-    )\n     return weights\n"
+  },
+  {
+    "experiment": 2,
+    "timestamp": "2026-05-05T22:50:48.285449+00:00",
+    "val_sharpe_before": 1.0911,
+    "kept": false,
+    "status": "diff_apply_failed",
+    "description": "Scale allocator weights by inverse trailing 20-day realized volatility to reduce exposure to strategies during unstable periods.",
+    "diff": "--- a/allocator.py\n+++ b/allocator.py\n@@ -6,6 +6,8 @@ The agent will refine this -- equal-weight is a deliberately weak baseline.\n from __future__ import annotations\n \n import pandas as pd\n+import numpy as np\n+\n \n \n def allocate(\n@@ -19,11 +21,21 @@ def allocate(\n     ``mean_reversion``, and ``buy_hold``. The baseline implementation\n     is a constant equal weight across all dates.\n     \"\"\"\n+    all_returns = pd.DataFrame({\n+        \"momentum\": momentum_returns,\n+        \"mean_reversion\": mean_reversion_returns,\n+        \"buy_hold\": buy_hold_returns,\n+    })\n+    \n+    realized_vol = all_returns.rolling(window=20, min_periods=20).std()\n+    inv_vol = 1.0 / realized_vol.replace(0, np.nan)\n+    inv_vol = inv_vol.fillna(0)\n+    \n+    row_sums = inv_vol.sum(axis=1).replace(0, 1)\n+    weights = inv_vol.div(row_sums, axis=0)\n+    weights = weights.fillna(1.0 / 3.0)\n+    \n     index = momentum_returns.index\n-    weights = pd.DataFrame(\n-        {\n-            \"momentum\": 1.0 / 3.0,\n-            \"mean_reversion\": 1.0 / 3.0,\n-            \"buy_hold\": 1.0 / 3.0,\n-        },\n-        index=index,\n-    )\n+    weights.index = index\n+    \n     return weights\n"
+  },
+  {
+    "experiment": 3,
+    "timestamp": "2026-05-05T22:50:57.404381+00:00",
+    "val_sharpe_before": 1.0911,
+    "kept": false,
+    "status": "diff_apply_failed",
+    "description": "Scale allocator weights by inverse realized volatility of each strategy's recent returns to reduce risk-adjusted exposure.",
+    "diff": "--- a/allocator.py\n+++ b/allocator.py\n@@ -5,6 +5,9 @@ The agent will refine this -- equal-weight is a deliberately weak baseline.\n from __future__ import annotations\n \n import pandas as pd\n+import numpy as np\n+\n+VOL_LOOKBACK = 20\n \n \n def allocate(\n@@ -19,11 +22,19 @@ def allocate(\n     ``mean_reversion``, and ``buy_hold``. The baseline implementation\n     is a constant equal weight across all dates.\n     \"\"\"\n-    index = momentum_returns.index\n+    # Compute rolling realized volatility for each strategy\n+    mom_vol = momentum_returns.rolling(window=VOL_LOOKBACK, min_periods=VOL_LOOKBACK).std()\n+    mr_vol = mean_reversion_returns.rolling(window=VOL_LOOKBACK, min_periods=VOL_LOOKBACK).std()\n+    bh_vol = buy_hold_returns.rolling(window=VOL_LOOKBACK, min_periods=VOL_LOOKBACK).std()\n+    \n+    # Inverse volatility weights\n+    inv_vol = pd.DataFrame({\"momentum\": 1.0 / mom_vol, \"mean_reversion\": 1.0 / mr_vol, \"buy_hold\": 1.0 / bh_vol})\n+    inv_vol = inv_vol.fillna(0).replace([np.inf, -np.inf], 0)\n+    \n+    # Normalize to sum to 1\n+    row_sums = inv_vol.sum(axis=1)\n     weights = pd.DataFrame(\n-        {\n-            \"momentum\": 1.0 / 3.0,\n-            \"mean_reversion\": 1.0 / 3.0,\n-            \"buy_hold\": 1.0 / 3.0,\n-        },\n-        index=index,\n+        {col: inv_vol[col] / row_sums for col in inv_vol.columns},\n+        index=inv_vol.index,\n     )\n+    weights = weights.fillna(1.0 / 3.0)\n     return weights\n"
+  }
+]
