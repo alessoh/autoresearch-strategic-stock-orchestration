@@ -69,5 +69,16 @@
     "diff": "--- a/strategies/mean_reversion.py\n+++ b/strategies/mean_reversion.py\n@@ -6,7 +6,7 @@ import pandas as pd\n \n # Tunable parameters -- agent may modify these\n LOOKBACK_DAYS = 10\n-ZSCORE_THRESHOLD = 1.5\n+ZSCORE_THRESHOLD = 1.2\n \n \n def compute_signal(prices: pd.DataFrame) -> pd.DataFrame:\n@@ -20,11 +20,18 @@ def compute_signal(prices: pd.DataFrame) -> pd.DataFrame:\n     \"\"\"\n     rolling_mean = prices.rolling(window=LOOKBACK_DAYS, min_periods=LOOKBACK_DAYS).mean()\n     rolling_std = prices.rolling(window=LOOKBACK_DAYS, min_periods=LOOKBACK_DAYS).std()\n+    \n+    # Compute realized volatility over a longer window to detect regime\n+    returns = prices.pct_change()\n+    realized_vol = returns.rolling(window=60, min_periods=60).std()\n+    long_vol = returns.rolling(window=252, min_periods=252).std()\n+    vol_ratio = realized_vol / long_vol\n+    \n     zscore = (prices - rolling_mean) / rolling_std\n \n     signal = zscore.copy()\n     signal[:] = 0\n-    signal[zscore < -ZSCORE_THRESHOLD] = 1\n-    signal[zscore > ZSCORE_THRESHOLD] = -1\n+    signal[zscore < -ZSCORE_THRESHOLD * vol_ratio] = 1\n+    signal[zscore > ZSCORE_THRESHOLD * vol_ratio] = -1\n     signal = signal.fillna(0)\n \n     return signal.shift(1).fillna(0)\n",
     "val_sharpe_after": 1.7659,
     "delta": -0.7193
+  },
+  {
+    "experiment": 73,
+    "timestamp": "2026-05-05T23:32:37.362205+00:00",
+    "val_sharpe_before": 3.1553,
+    "kept": false,
+    "status": "ok",
+    "description": "Add volatility regime detection to allocator to favor mean-reversion in low-vol and momentum in high-vol regimes.",
+    "diff": "--- a/allocator.py\n+++ b/allocator.py\n@@ -24,6 +24,15 @@ def allocate(\n     mr_vol = mean_reversion_returns.rolling(window=vol_lookback, min_periods=vol_lookback).std()\n     bh_vol = buy_hold_returns.rolling(window=vol_lookback, min_periods=vol_lookback).std()\n \n+    # Detect volatility regime using market volatility (average across strategies)\n+    market_vol = (mom_vol + mr_vol + bh_vol) / 3.0\n+    long_vol = market_vol.rolling(window=120, min_periods=120).mean()\n+    \n+    # High-vol regime flag: current vol > long-term average\n+    high_vol_regime = (market_vol > long_vol).fillna(False)\n+    regime_tilt_mom = high_vol_regime.astype(float) * 0.3\n+    regime_tilt_mr = (~high_vol_regime).astype(float) * 0.3\n+\n     # Compute rolling 60-day cumulative returns (momentum of strategies)\n     mom_perf = momentum_returns.ewm(span=vol_lookback, min_periods=vol_lookback).mean() * vol_lookback\n     mr_perf = mean_reversion_returns.ewm(span=vol_lookback, min_periods=vol_lookback).mean() * vol_lookback\n@@ -34,6 +43,10 @@ def allocate(\n     mr_score = mr_perf / mr_vol\n     bh_score = bh_perf / bh_vol\n \n+    # Apply regime tilt\n+    mom_score = mom_score + regime_tilt_mom\n+    mr_score = mr_score + regime_tilt_mr\n+\n     # Use positive scores only, zero out negative\n     scores = pd.DataFrame({'momentum': mom_score, 'mean_reversion': mr_score, 'buy_hold': bh_score})\n     scores = scores.clip(lower=0)\n",
+    "val_sharpe_after": 3.1452,
+    "delta": -0.0101
   }
 ]

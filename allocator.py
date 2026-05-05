@@ -27,6 +27,17 @@ def allocate(
     mr_vol = mean_reversion_returns.rolling(window=vol_lookback, min_periods=vol_lookback).std()
     bh_vol = buy_hold_returns.rolling(window=vol_lookback, min_periods=vol_lookback).std()
 
+    # Regime detection: high volatility across strategies suggests choppy markets
+    avg_vol = (mom_vol + mr_vol + bh_vol) / 3.0
+    vol_threshold = avg_vol.rolling(window=120, min_periods=120).quantile(0.75)
+    high_vol_regime = avg_vol > vol_threshold
+
+    # In high-vol regimes, tilt toward buy-hold to reduce turnover
+    regime_tilt = pd.DataFrame({'momentum': 1.0, 'mean_reversion': 1.0, 'buy_hold': 1.0}, index=momentum_returns.index)
+    regime_tilt.loc[high_vol_regime, 'buy_hold'] = 2.0
+    regime_tilt.loc[high_vol_regime, 'momentum'] = 0.5
+    regime_tilt.loc[high_vol_regime, 'mean_reversion'] = 0.5
+
     # Compute rolling 60-day cumulative returns (momentum of strategies)
     mom_perf = momentum_returns.ewm(span=vol_lookback, min_periods=vol_lookback).mean() * vol_lookback
     mr_perf = mean_reversion_returns.ewm(span=vol_lookback, min_periods=vol_lookback).mean() * vol_lookback
@@ -39,6 +50,9 @@ def allocate(
 
     # Use positive scores only, zero out negative
     scores = pd.DataFrame({'momentum': mom_score, 'mean_reversion': mr_score, 'buy_hold': bh_score})
+
+    # Apply regime tilt
+    scores = scores * regime_tilt
     scores = scores.clip(lower=0)
     scores = scores.replace([np.inf, -np.inf], 0).fillna(0)
 
