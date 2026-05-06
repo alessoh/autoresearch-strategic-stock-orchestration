@@ -1,6 +1,6 @@
 {
-  "train_sharpe": 0.9147,
-  "val_sharpe": 1.0911,
-  "final_test_sharpe": 1.6606,
-  "generated_at": "2026-05-05T22:43:12.424850+00:00"
+  "train_sharpe": 3.0102,
+  "val_sharpe": 3.626,
+  "final_test_sharpe": 6.5319,
+  "generated_at": "2026-05-06T20:46:01.713207+00:00"
 }
