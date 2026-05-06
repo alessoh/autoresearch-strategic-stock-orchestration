@@ -91,5 +91,16 @@
     "diff": "--- a/strategies/mean_reversion.py\n+++ b/strategies/mean_reversion.py\n@@ -5,7 +5,7 @@ from __future__ import annotations\n import pandas as pd\n \n # Tunable parameters -- agent may modify these\n-LOOKBACK_DAYS = 10\n+LOOKBACK_DAYS = 5\n ZSCORE_THRESHOLD = 1.5\n \n",
     "val_sharpe_after": 1.8611,
     "delta": -1.3675
+  },
+  {
+    "experiment": 104,
+    "timestamp": "2026-05-05T23:37:49.550485+00:00",
+    "val_sharpe_before": 3.626,
+    "kept": false,
+    "status": "ok",
+    "description": "Shorten mean-reversion lookback from 10 to 6 days to capture faster price oscillations and improve signal responsiveness.",
+    "diff": "--- a/strategies/mean_reversion.py\n+++ b/strategies/mean_reversion.py\n@@ -5,7 +5,7 @@ from __future__ import annotations\n import pandas as pd\n \n # Tunable parameters -- agent may modify these\n-LOOKBACK_DAYS = 10\n+LOOKBACK_DAYS = 6\n ZSCORE_THRESHOLD = 1.5\n \n \n",
+    "val_sharpe_after": 2.4812,
+    "delta": -1.1448
   }
 ]
