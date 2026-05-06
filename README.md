@@ -72,6 +72,11 @@ The cycle each iteration:
 | `RESEARCH.md` | Instructions Claude reads each iteration. |
 | `dashboard/` | Next.js dashboard. |
 
+## Contact
+
+- **Homepage:** [AI HIVE](https://www.ai-hive.net)
+- **Email:** [EMAIL_ADDRESS] (h.alesso@comcast.net)
+
 ## License
 
 MIT. See `LICENSE`.
